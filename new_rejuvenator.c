@@ -94,6 +94,20 @@ int chance_index_p = 0;                 // index pointer in chance_arr
         page<=0 ? 0 :
             (is_valid_page[block][page-1] == false ? count_efficiency(block, page-1) + 1 : count_efficiency(block, page-1));
     
+    lemma a_clean_block {L}:
+        \forall integer i; 0 <= i < N_PHY_BLOCKS ==> clean[index_2_physical[i]] == true
+            ==> \forall integer j, m, n; 0 <= m < N_PHY_BLOCKS && 0 <= n < N_PAGE && 0 <= j < N_PAGE
+                ==> l_to_p[m][n] != index_2_physical[i] * N_PAGE + j && disk[index_2_physical[i]][j] == -1;
+    
+    lemma active_block {l}:
+        \forall integer i, j, m, n; 0 <= m < N_PHY_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= i < N_PAGE && h_act_page_p <= j < N_PAGE
+            ==> l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + i && disk[index_2_physical[l_act_block_index_p]][i] == -1
+             && l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + j && disk[index_2_physical[h_act_block_index_p]][j] == -1;
+    
+    lemma somewhere_clean {L}:
+        1 <= clean_counter == count_clean(N_PHY_BLOCKS)
+            ==> \exists integer i; 0 <= i < N_PHY_BLOCKS && clean[index_2_physical[i]] == true;
+    
 */
 /*
     lemma same_count {L1,L2}:
@@ -112,7 +126,6 @@ int chance_index_p = 0;                 // index pointer in chance_arr
     int logical_disk[N_LOG_BLOCKS][N_PAGE];    // logical disk array
     int ghost_erase_count[N_PHY_BLOCKS];       // ghost erase count array
 */
-
 
 /* TODO
 
@@ -257,66 +270,76 @@ int _r (int pb, int pg) {
    return disk[pb][pg];
 }
 
-
 /*@
 /// Require ///
-    /// General Constraints ///
-    requires \exists integer i, j; 0 <= i < N_PHY_BLOCKS && 0 <= j < N_PHY_BLOCKS && i != j && clean[index_2_physical[i]] == clean[index_2_physical[j]] == true;
+/// General Constraints ///
+ // erase_block_index[] in range
     requires \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     requires bijection(index_2_physical);
     requires \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+ // active pointers in range
     requires 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     requires 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
-    requires clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+ // clean_counter == # of true in clean[] && in range
     requires 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
-         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
+ // clean[active pointing block] == false
+    requires clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
     requires 0 <= chance_index_p < LRU_SIZE;
-    
-    /// User > valid logical address ///
+/// User ///
+ // valid logical address
     requires 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE;
-    
-    /// System > active pointers point to empty pages ///
+/// System ///
+ // active pointers point to empty pages
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
-         && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+         ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+          && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
     requires disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
           == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
-    
+ // original data in memory are still the same
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
+         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
 /// Ensure ////
-    /// General Constraints ///
-    ensures \exists integer i, j; 0 <= i < N_PHY_BLOCKS && 0 <= j < N_PHY_BLOCKS && i != j
-         && clean[index_2_physical[i]] == clean[index_2_physical[j]] == true;
+/// General Constraints ///
+ // erase_block_index[] in range
     ensures \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     ensures bijection(index_2_physical);
     ensures \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+ // active pointers in range
     ensures 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     ensures 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
-    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+ // clean_counter == # of true in clean[] && in range
     ensures 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
-        ==> \old(logical_disk[i][j]) == logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
+ // clean[active pointing block] == false
+    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
     ensures 0 <= chance_index_p < LRU_SIZE;
-    
-    /// User > valid mapping & equivalent data ///
-    ensures 0 <= l_to_p[lb][lp] < N_PHY_BLOCKS * N_PAGE;
+/// User ///
+ // valid mapping
+    ensures l_to_p[lb][lp] != -1;
+ // equivalent data
     ensures d == logical_disk[lb][lp]
               == disk[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE];
-    
-    /// System > active pointers point to empty pages & valid page ///
+/// System ///
+ // active pointers point
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> logical_disk[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
-         && logical_disk[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+        ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+         && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
     ensures disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
          == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+ // original data in memory are still the same == \old(logical_disk[][])
+    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
+        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]);
+ // valid page (is_valid_page[][])
     ensures \old(l_to_p[lb][lp]) != -1
         ==> is_valid_page[\old(l_to_p[lb][lp]) / N_PAGE][\old(l_to_p[lb][lp]) % N_PAGE] == false;
     ensures is_valid_page[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE] == true;
-    
 /// Assign ///
     
 */
@@ -329,17 +352,11 @@ void write (int d, int lb, int lp) {
     update_lru(lb, lp);
     
      //if there is no clean block then GC
-    if (clean_counter < 2){
-        gc();
-    }
+    //if (clean_counter < 2){
+    //    gc();
+    //}
 }
 
-/*
-*   Write helper function
-*    :param d:  data
-*    :param lb: logical block address
-*    :param lp: logical page number
-*/
 /*
 NEED TO DO:
 Requires: variable_in_range();  //use predicate
@@ -353,69 +370,84 @@ Ensures: Ghost_disk[lb][lp] =d = Disk[l2p_b(lb) ][ l2p_p(lp)]
 */
 /*@
 /// Require ///
-    /// General Constraints ///
-    requires \exists integer i, j; 0 <= i < N_PHY_BLOCKS && 0 <=j < N_PHY_BLOCKS && i != j
-          && clean[index_2_physical[i]] == clean[index_2_physical[j]] == true;
+/// General Constraints ///
+ // erase_block_index[] in range
     requires \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     requires bijection(index_2_physical);
     requires \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+ // active pointers in range
     requires 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     requires 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
-    requires clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+ // clean_counter == # of true in clean[] && in range
     requires 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
-        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// User > valid logical address ///
+ // clean[active pointing block] == false
+    requires clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+    requires 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+ // valid logical address
     requires 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE;
+ // equivalent data of logical part
     requires d == logical_disk[lb][lp];
-    
-    /// System > active pointers point to empty pages ///
-    requires \forall integer lb, lp; 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE
-        ==> l_to_p[lb][lp] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
-         && l_to_p[lb][lp] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+/// System ///
+ // active pointers point to empty pages
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
+         ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+          && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
     requires disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
           == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
-    
+ // original data in memory are still the same
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
+         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
 /// Ensure ////
-    /// General Constraints ///
-    ensures \exists integer i; 0 <= i < N_PHY_BLOCKS && clean[index_2_physical[i]] == true;
+ // General Constraints ///
+ // erase_block_index[] in range
     ensures \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     ensures bijection(index_2_physical);
     ensures \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+ // active pointers in range
     ensures 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     ensures 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
-    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+ // clean_counter == # of true in clean[] && in range
     ensures 1 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
-        ==> \old(logical_disk[i][j]) == logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// User > valid mapping & equivalent data ///
+ // clean[active pointing block] == false
+    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+    ensures 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+ // valid mapping
+    ensures l_to_p[lb][lp] != -1;
+    ensures l_to_p[lb][lp] == index_2_physical[\old(l_act_block_index_p)] * N_PAGE + \old(l_act_page_p)
+                           || index_2_physical[\old(h_act_block_index_p)] * N_PAGE + \old(h_act_page_p);
     ensures 0 <= l_to_p[lb][lp] < N_PHY_BLOCKS * N_PAGE;
+ // equivalent data
     ensures d == logical_disk[lb][lp]
               == disk[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE];
-    
-    /// System > active pointers point to empty pages & valid page ///
+/// System ///
+ // active pointers point
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> logical_disk[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
-         && logical_disk[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+        ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+         && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
     ensures disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
          == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+ // original data in memory are still the same == \old(logical_disk[][])
+    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
+        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]) == \old(disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE]);
+ // valid page (is_valid_page[][])
     ensures \old(l_to_p[lb][lp]) != -1
         ==> is_valid_page[\old(l_to_p[lb][lp]) / N_PAGE][\old(l_to_p[lb][lp]) % N_PAGE] == false;
     ensures is_valid_page[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE] == true;
-    
 /// Assign ///
     
 */
 void write_helper (int d, int lb, int lp) {
-    //check the logical address is hot or cold
     int isHot = isHotPage(lb, lp);
-    //@ assert logical_disk[lb][lp] == d;
     if(isHot != 1) { //cold data
         write_2_higher_number_list(d, lb, lp);
     } else {          //hot data
@@ -423,86 +455,100 @@ void write_helper (int d, int lb, int lp) {
     }
 }
 
-/*
-*   Helper function of writting to higher num list
-*    :param d: data
-*    :param lb: logical block address
-*    :param lp: logical page number
-*/
-/*
-245    assigns is_valid_page[ l_to_p[lb][lp] / N_PAGE ][ l_to_p[lb][lp] % N_PAGE ];
-246    assigns disk[(l_to_p[lb][lp] / N_PAGE)][(l_to_p[lb][lp] % N_PAGE)];
-247    assigns spare_area[ l_to_p[lb][lp] / N_PAGE ][ l_to_p[lb][lp] % N_PAGE ];
-    assigns clean[index_2_physical[h_act_block_index_p]];
-*/
+/* Problem
+ *  How to connect the relationship between clean[] with clean_counter  (# of true in clean[] == clean_counter)    [1].
+ *                               && between clean[] with disk[][]       (clean[i] == true ==> disk[i][0 .. N_PAGE] == {-1} * N_PAGE)    [2].
+ *  [1]. ==> if clean_counter > 0 that means we must can find out a clean block if current active block is full after written
+ *       ==> which means the index in the loop for searching clean block won't get out of bounds
+ *  [2]. ==> if we can find a clean block then corresponding disk[i][0] must be -1
+ *       ==> which ensures that next page we found is also a clean page
+ */
 /*@
 /// Require ///
-    /// General Constraints ///
-    requires \exists integer i, j; 0 <= i < N_PHY_BLOCKS && 0 <=j < N_PHY_BLOCKS && i != j
-          && clean[index_2_physical[i]] == clean[index_2_physical[j]] == true;
+/// General Constraints ///
+ // erase_block_index[] in range
     requires \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     requires bijection(index_2_physical);
     requires \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
          ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
-    requires 0 <= h_act_block_index_p < N_PHY_BLOCKS;
-    requires 0 <= h_act_page_p < N_PAGE;
-    requires clean[index_2_physical[h_act_block_index_p]] == false;
+ // active pointers in range
+    requires 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
+    requires 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
+ // clean_counter == # of true in clean[] && in range
     requires 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
+ // clean[active pointing block] == false
+    requires clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+    requires 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+ // valid logical address
+    requires 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE;
+ // equivalent data of logical part
+    requires d == logical_disk[lb][lp];
+/// System ///
+ // active pointers point to empty pages
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
+         ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+          && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+    requires disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
+          == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+ // original data in memory are still the same
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
          ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// User > valid logical address && equivalent data ///
-    requires 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE;
-    requires d == logical_disk[lb][lp];
-    
-    /// System > active pointers point to empty pages ///
-    requires \forall integer lb, lp; 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE
-         ==> l_to_p[lb][lp] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
-    requires disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
-    requires d == logical_disk[lb][lp];
-    
 /// Ensure ////
-    /// General Constraints ///
-    ensures \exists integer i; 0 <= i < N_PHY_BLOCKS && clean[index_2_physical[i]] == true;
+ // General Constraints ///
+ // erase_block_index[] in range
     ensures \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     ensures bijection(index_2_physical);
     ensures \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
-    ensures 0 <= h_act_block_index_p < N_PHY_BLOCKS;
-    ensures 0 <= h_act_page_p < N_PAGE;
-    ensures clean[index_2_physical[h_act_block_index_p]] == false;
+ // active pointers in range
+    ensures 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
+    ensures 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
+ // clean_counter == # of true in clean[] && in range
     ensures 1 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
-        ==> \old(logical_disk[i][j]) == logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// User > valid mapping & equivalent data ///
+ // clean[active pointing block] == false
+    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+    ensures 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+ // valid mapping
     ensures l_to_p[lb][lp] == index_2_physical[\old(h_act_block_index_p)] * N_PAGE + \old(h_act_page_p);
+ // equivalent data
     ensures d == logical_disk[lb][lp]
               == disk[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE];
-    
-    /// System > active pointers point to empty page & valid page ///
+/// System ///
+ // active pointers point
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> logical_disk[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
-    ensures disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+        ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+         && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+    ensures disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
+         == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+ // original data in memory are still the same == \old(logical_disk[][])
+    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
+        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]) == \old(disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE]);
+ // valid page (is_valid_page[][])
     ensures \old(l_to_p[lb][lp]) != -1
         ==> is_valid_page[\old(l_to_p[lb][lp]) / N_PAGE][\old(l_to_p[lb][lp]) % N_PAGE] == false;
     ensures is_valid_page[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE] == true;
-    behavior block_full:
+    //ensures spare_area[ l_to_p[lb][lp] / N_PAGE ][ l_to_p[lb][lp] % N_PAGE ] == lb * N_PAGE + lp;
+    
+    behavior block_full_after_written:
         assumes h_act_page_p + 1 == N_PAGE;
         ensures \forall integer i; 0 <= i < N_PHY_BLOCKS && i != index_2_physical[h_act_block_index_p]
             ==> clean[i] == \old(clean[i]);
         ensures clean[index_2_physical[h_act_block_index_p]] == false;
         ensures h_act_page_p == 0;
-    behavior block_not_full:
+    behavior block_not_full_after_written:
         assumes h_act_page_p + 1 != N_PAGE;
         ensures \forall integer i; 0 <= i < N_PHY_BLOCKS ==> clean[i] == \old(clean[i]);
         ensures h_act_page_p == \old(h_act_page_p) + 1;
     complete behaviors;
     disjoint behaviors;
-    
-    //ensures spare_area[ l_to_p[lb][lp] / N_PAGE ][ l_to_p[lb][lp] % N_PAGE ] == lb * N_PAGE + lp;
     
 /// Assign ///
     
@@ -510,19 +556,18 @@ void write_helper (int d, int lb, int lp) {
 void write_2_higher_number_list (int d, int lb, int lp) {
     //invalidate old physical address
     if(l_to_p[lb][lp] != -1) {
-        //clean previous physical address from the same logical address
         int old_addr = l_to_p[lb][lp];
-        int opb = old_addr / N_PAGE; //turn page addressing to block id
-        int opp = old_addr % N_PAGE; //turn page addressing to page offset
+        int opb = old_addr / N_PAGE;
+        int opp = old_addr % N_PAGE;
         is_valid_page[opb][opp] = false;
     }
     //@ assert l_to_p[lb][lp] != -1 ==> is_valid_page[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE] == false;
     
     //write data to new physical address
-    int pb = index_2_physical[h_act_block_index_p]; //get active block ID
-    int pp = h_act_page_p;  //get active page
-    _w(d, pb, pp);  //write data
-    //@ assert d == disk[pb][pp] == logical_disk[lb][lp];
+    int pb = index_2_physical[h_act_block_index_p];
+    int pp = h_act_page_p;
+    _w(d, pb, pp);
+    //@ assert d == disk[pb][pp] == logical_disk[lb][lp] == disk[index_2_physical[h_act_block_index_p]][h_act_page_p];
     
     //update logical to physical mapping
     int new_addr = pb * N_PAGE + pp;
@@ -535,15 +580,16 @@ void write_2_higher_number_list (int d, int lb, int lp) {
     
     //update active pointer value
    if(h_act_page_p + 1 == N_PAGE) {
-        // page + 1 == block size
         h_act_page_p = 0;
-        
-        // move the high pointer to the next clean block
-        // firstly search a clean block from the head of the high number list
         h_act_block_index_p = N_PHY_BLOCKS / 2;
+        
+        //@ assert \exists integer i; 0 <= i < N_PHY_BLOCKS && clean[index_2_physical[i]] == true;
+        //@ assert (\exists integer i; 0 <= i < N_PHY_BLOCKS / 2 && clean[index_2_physical[i]] == true ) || (\exists integer i; N_PHY_BLOCKS / 2 <= i < N_PHY_BLOCKS && clean[index_2_physical[i]] == true );
+        
         /*@
             loop invariant N_PHY_BLOCKS / 2 <= h_act_block_index_p <= N_PHY_BLOCKS;
-            loop invariant \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+            loop invariant \forall integer i; 0 <= i < N_PHY_BLOCKS ==> index_2_physical[i] == \at(index_2_physical[i], Pre);
+            //loop invariant \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
             loop invariant \forall integer i; N_PHY_BLOCKS / 2 <= i < h_act_block_index_p ==> clean[index_2_physical[i]] == false;
             loop assigns h_act_block_index_p;
             loop variant N_PHY_BLOCKS - h_act_block_index_p;
@@ -553,32 +599,73 @@ void write_2_higher_number_list (int d, int lb, int lp) {
             h_act_block_index_p ++;
         }
         
+        /*@ ghost
+        /@
+           assert \exists integer i; 0 <= i < N_PHY_BLOCKS / 2 && clean[index_2_physical[i]] == true ==> N_PHY_BLOCKS / 2 <= h_act_block_index_p < N_PHY_BLOCKS;
+         @/
+        if (h_act_block_index_p < N_PHY_BLOCKS) {
+            /@ assert N_PHY_BLOCKS / 2 <= h_act_block_index_p < N_PHY_BLOCKS && clean[index_2_physical[h_act_block_index_p]] == true; @/
+            
+            /@ assert clean[index_2_physical[h_act_block_index_p]] == true; @/
+            /@ assert \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE ==> l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p; @/
+            /@ assert disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1; @/
+        }
+        else {
+            /@ assert \forall integer i; N_PHY_BLOCKS / 2 <= i < N_PHY_BLOCKS ==> clean[index_2_physical[i]] == false; @/
+        }
+        */
+        
         //if no clean blocks in higher number list, then search clean block in lower number list
         if(h_act_block_index_p == N_PHY_BLOCKS){
+            //@ assert \exists integer i; 0 <= i < N_PHY_BLOCKS / 2 && clean[index_2_physical[i]] == true;
+            //@ assert \forall integer i; N_PHY_BLOCKS / 2 <= i < N_PHY_BLOCKS ==> clean[index_2_physical[i]] == false;
             h_act_block_index_p = 0;
             /*@
-                loop invariant 0 <= h_act_block_index_p < N_PHY_BLOCKS / 2;
-                loop invariant \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+                loop invariant 0 <= h_act_block_index_p <= N_PHY_BLOCKS / 2;
+                loop invariant \forall integer i; 0 <= i < N_PHY_BLOCKS ==> index_2_physical[i] == \at(index_2_physical[i], Pre);
+                //loop invariant \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
                 loop invariant \forall integer i; 0 <= i < h_act_block_index_p ==> clean[index_2_physical[i]] == false;
                 loop assigns h_act_block_index_p;
                 loop variant N_PHY_BLOCKS / 2 - h_act_block_index_p;
             */
             while (h_act_block_index_p < N_PHY_BLOCKS / 2){
                 if (clean[index_2_physical[h_act_block_index_p]] == true) break; // find a clean block
-                h_act_block_index_p++;
-                if (h_act_block_index_p == N_PHY_BLOCKS / 2) break; // out of range ???
+                h_act_block_index_p ++;
+                //if (h_act_block_index_p == N_PHY_BLOCKS / 2) break; // out of range ???
             }
+            //@ assert 0 <= h_act_block_index_p < N_PHY_BLOCKS / 2 && clean[index_2_physical[h_act_block_index_p]] == true;
+            
+            //@ assert clean[index_2_physical[h_act_block_index_p]] == true;
+            //@ assert \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE ==> l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+            //@ assert disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
         }
         ///!ERROR: if (h_act_block_index_p == N_PHY_BLOCKS / 2) no any clean block
-        //@ assert \exists integer i, j; 0 <= i < N_PHY_BLOCKS && 0 <=j < N_PHY_BLOCKS && i != j && clean[index_2_physical[i]] == clean[index_2_physical[i]] == true ==> h_act_block_index_p != N_PHY_BLOCKS / 2;
-        //@ assert clean[index_2_physical[h_act_block_index_p]] == true;
         
         clean[index_2_physical[h_act_block_index_p]] = false;
         clean_counter -= 1;
+        /*@ ghost
+        /@ 
+            loop invariant 0 <= i <= index_2_physical[h_act_block_index_p] ;
+            loop invariant count_clean(i) == count_clean{Pre}(i);
+            loop assigns i;
+            loop variant index_2_physical[h_act_block_index_p] - i ;
+        @/
+        for(int i = 0 ; i < index_2_physical[h_act_block_index_p] ; i++);
+        
+        /@
+            loop invariant index_2_physical[h_act_block_index_p] < i <= N_PHY_BLOCKS;
+            loop invariant count_clean(i) == count_clean{Pre}(i) - 1;
+            loop assigns i;
+            loop variant N_PHY_BLOCKS - i ;
+        @/
+        for(int i = index_2_physical[h_act_block_index_p] + 1 ; i < N_PHY_BLOCKS ; i++);
+        */
         //@ assert clean_counter == count_clean(N_PHY_BLOCKS);
     }else{
         // page + 1 < block size
         h_act_page_p +=1;
+        //@ assert \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE ==> l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+        //@ assert disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
     }
 }
 
@@ -590,55 +677,78 @@ void write_2_higher_number_list (int d, int lb, int lp) {
 */
 /*@
 /// Require ///
-    /// General Constraints ///
+/// General Constraints ///
+ // erase_block_index[] in range
     requires \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     requires bijection(index_2_physical);
     requires \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
-    requires 0 <= l_act_block_index_p < N_PHY_BLOCKS;
-    requires 0 <= l_act_page_p < N_PAGE;
-    requires clean[index_2_physical[l_act_block_index_p]] == false;
+         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+ // active pointers in range
+    requires 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
+    requires 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
+ // clean_counter == # of true in clean[] && in range
     requires 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
-        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// User > valid logical address && equivalent data ///
+ // clean[active pointing block] == false
+    requires clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+    requires 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+ // valid logical address
     requires 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE;
+ // equivalent data of logical part
     requires d == logical_disk[lb][lp];
-    
-    /// System > active pointers point to empty pages ///
-    requires \forall integer lb, lp; 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE
-        ==> l_to_p[lb][lp] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p;
-    requires disk[index_2_physical[l_act_block_index_p]][l_act_page_p] == -1;
-    requires d == logical_disk[lb][lp];
-    
+/// System ///
+ // active pointers point to empty pages
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
+         ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+          && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+    requires disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
+          == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+ // original data in memory are still the same
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
+         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
 /// Ensure ////
-    /// General Constraints ///
+ // General Constraints ///
+ // erase_block_index[] in range
     ensures \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     ensures bijection(index_2_physical);
     ensures \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
-    ensures 0 <= l_act_block_index_p < N_PHY_BLOCKS;
-    ensures 0 <= l_act_page_p < N_PAGE;
-    ensures clean[index_2_physical[l_act_block_index_p]] == false;
+ // active pointers in range
+    ensures 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
+    ensures 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
+ // clean_counter == # of true in clean[] && in range
     ensures 1 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
-        ==> \old(logical_disk[i][j]) == logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// User > valid mapping & equivalent data ///
-    ensures l_to_p[lb][lp] == index_2_physical[\old(l_act_block_index_p)] * N_PAGE + \old(h_act_page_p);
+ // clean[active pointing block] == false
+    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+    ensures 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+ // valid mapping
+    ensures l_to_p[lb][lp] == index_2_physical[\old(l_act_block_index_p)] * N_PAGE + \old(l_act_page_p);
+ // equivalent data
     ensures d == logical_disk[lb][lp]
               == disk[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE];
-    
-    /// System > active pointers point to empty page & valid page ///
+/// System ///
+ // active pointers point
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> logical_disk[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p;
-    ensures disk[index_2_physical[l_act_block_index_p]][l_act_page_p] == -1;
+        ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+         && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
+    ensures disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
+         == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+ // original data in memory are still the same == \old(logical_disk[][])
+    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
+        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]);
+ // valid page (is_valid_page[][])
     ensures \old(l_to_p[lb][lp]) != -1
         ==> is_valid_page[\old(l_to_p[lb][lp]) / N_PAGE][\old(l_to_p[lb][lp]) % N_PAGE] == false;
     ensures is_valid_page[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE] == true;
+    //ensures spare_area[ l_to_p[lb][lp] / N_PAGE ][ l_to_p[lb][lp] % N_PAGE ] == lb * N_PAGE + lp;
+
     behavior block_full:
         assumes l_act_page_p + 1 == N_PAGE;
         ensures \forall integer i; 0 <= i < N_PHY_BLOCKS && i != index_2_physical[l_act_block_index_p]
@@ -651,8 +761,6 @@ void write_2_higher_number_list (int d, int lb, int lp) {
         ensures l_act_page_p == \old(l_act_page_p) + 1;
     complete behaviors;
     disjoint behaviors;
-    
-    //ensures spare_area[ l_to_p[lb][lp] / N_PAGE ][ l_to_p[lb][lp] % N_PAGE ] == lb * N_PAGE + lp;
     
 /// Assign ///
     
@@ -720,57 +828,65 @@ void write_2_lower_number_list (int d, int lb, int lp) {
 */
 /*@
 /// Require ///
-    /// General Constraints ///
+/// General Constraints ///
+ // erase_block_index[] in range
     requires \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     requires bijection(index_2_physical);
     requires \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+ // active pointers in range
     requires 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     requires 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
+ // clean_counter == # of true in clean[] && in range
+    requires 1 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
+ // clean[active pointing block] == false
     requires clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
-    requires 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1
-        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// system > active pointers point to empty pages ///
-    requires \forall integer lb, lp; 0 <= lb < N_LOG_BLOCKS && 0 <= lp < N_PAGE
-        ==> l_to_p[lb][lp] != index_2_physical[l_act_block_index_p] * l_act_page_p
-         && l_to_p[lb][lp] != index_2_physical[h_act_block_index_p] * h_act_page_p;
+    requires 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+/// System ///
+ // active pointers point to empty pages
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
+         ==> l_to_p[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+          && l_to_p[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
     requires disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
           == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
-    
-    assigns clean[0 .. (N_PHY_BLOCKS - 1)];
-    assigns is_valid_page[0 .. (N_PHY_BLOCKS - 1)][0 .. (N_PAGE - 1)];
-    assigns erase_count_index[0 .. (MAX_WEAR_CNT - 1)];
-    assigns index_2_physical[0 .. (N_PHY_BLOCKS - 1)];
-    assigns spare_area[0 .. (N_PHY_BLOCKS - 1)][0 .. (N_PAGE - 1)];
-    assigns disk[0 .. (N_PHY_BLOCKS - 1)][0 .. (N_PAGE - 1)];
-    assigns l_to_p[0 .. (N_LOG_BLOCKS - 1)][0 .. (N_PAGE - 1)];
-    assigns l_act_block_index_p, h_act_block_index_p;
-    assigns l_act_page_p, h_act_page_p;
-    assigns clean_counter;
-
+ // original data in memory are still the same
+    requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1
+         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
 /// Ensure ////
-    /// General Constraints ///
+/// General Constraints ///
+ // erase_block_index[] in range
     ensures \forall integer i; 0 <= i < MAX_WEAR_CNT ==> 0 <= erase_count_index[i] <= N_PHY_BLOCKS;
+ // index_2_physical[] is bijection && in range
     ensures bijection(index_2_physical);
     ensures \forall integer i; 0 <= i < N_PHY_BLOCKS ==> 0 <= index_2_physical[i] < N_PHY_BLOCKS;
+ // l_to_p[][] in range
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
+ // active pointers in range
     ensures 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     ensures 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
-    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+ // clean_counter == # of true in clean[] && in range
     ensures 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
-    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1
-        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
-    
-    /// system > active pointers point to empty pages ///
+ // clean[active pointing block] == false
+    ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
+    ensures 0 <= chance_index_p < LRU_SIZE;
+/// User ///
+/// System ///
+ // active pointers point
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
-        ==> logical_disk[i][j] != index_2_physical[l_act_block_index_p] * l_act_page_p
-         && logical_disk[i][j] != index_2_physical[h_act_block_index_p] * h_act_page_p;
+        ==> logical_disk[i][j] != index_2_physical[l_act_block_index_p] * N_PAGE + l_act_page_p
+         && logical_disk[i][j] != index_2_physical[h_act_block_index_p] * N_PAGE + h_act_page_p;
     ensures disk[index_2_physical[l_act_block_index_p]][l_act_page_p]
-          == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+         == disk[index_2_physical[h_act_block_index_p]][h_act_page_p] == -1;
+ // original data in memory are still the same == \old(logical_disk[][])
+    ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1
+        ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]);
+/// Assign ///
+    
 */
 void gc (void) {
     /*@
@@ -1171,11 +1287,11 @@ void erase_block_data (int idx) {
     
     /@
         loop invariant index_2_physical[idx] < i <= N_PHY_BLOCKS;
-        loop invariant count_clean(i) == 1 + count_clean{Pre}(i);
+        loop invariant count_clean(i) == count_clean{Pre}(i) + 1;
         loop assigns i;
         loop variant N_PHY_BLOCKS - i ;
     @/
-    for(int i = index_2_physical[idx]+1 ; i < N_PHY_BLOCKS ; i++);
+    for(int i = index_2_physical[idx] + 1 ; i < N_PHY_BLOCKS ; i++);
     */
     
     //update erase count for pb
@@ -1190,6 +1306,9 @@ void erase_block_data (int idx) {
     assigns  \nothing;
   */
 void _erase_block (int pb) {
+    for (int i = 0 ; i < N_PHY_BLOCKS; i++) {
+        disk[pb][i] = -1;
+    }
     //pass
 }
 
@@ -1421,10 +1540,10 @@ void replace_and_update (int la) {
     
 /// Ensure ///
     behavior Hot:
-      assumes \exists integer i; 0 <= i < N_LOG_BLOCKS * N_PAGE && cache[i] == lb * N_PAGE + lp;
+      assumes \exists integer i; 0 <= i < LRU_SIZE && cache[i] == lb * N_PAGE + lp;
       ensures \result == 1;
     behavior NoHot:
-      assumes \forall integer i; 0 <= i < N_LOG_BLOCKS * N_PAGE && cache[i] != lb * N_PAGE + lp;
+      assumes \forall integer i; 0 <= i < LRU_SIZE ==> cache[i] != lb * N_PAGE + lp;
       ensures \result == 0;
     disjoint behaviors;
     complete behaviors;
@@ -1433,9 +1552,10 @@ int isHotPage (int lb, int lp) {
     int la = lb * N_PAGE + lp;
     /*@
         loop invariant 0 <= i <= LRU_SIZE;
+        loop invariant \forall integer j; 0 <= j < i ==> cache[j] != lb * N_PAGE + lp;
         loop assigns i;
     */
-    for(int i=0 ; i<LRU_SIZE ; i++){
+    for(int i = 0 ; i < LRU_SIZE ; i++){
         if(cache[i] == la){
             return 1;
         }
