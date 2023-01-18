@@ -331,6 +331,22 @@ int _r (int pb, int pp) {
          ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
     
 /// Assign ///
+    assigns logical_disk[lb][lp];
+    assigns clean[0 .. N_PHY_BLOCKS - 1];
+    assigns is_valid_page[\old(l_to_p[lb][lp]) / N_PAGE][\old(l_to_p[lb][lp]) % N_PAGE];
+    assigns is_valid_page[index_2_physical[\old(l_act_block_index_p)]][\old(l_act_page_p)];
+    assigns is_valid_page[index_2_physical[\old(h_act_block_index_p)]][\old(h_act_page_p)];
+    assigns l_to_p[lb][lp] ;
+    assigns spare_area[index_2_physical[\old(l_act_block_index_p)]][\old(l_act_page_p)];
+    assigns spare_area[index_2_physical[\old(h_act_block_index_p)]][\old(h_act_page_p)];
+    assigns disk[index_2_physical[\old(l_act_block_index_p)]][\old(l_act_page_p)];
+    assigns disk[index_2_physical[\old(h_act_block_index_p)]][\old(h_act_page_p)];
+    assigns l_act_block_index_p, l_act_page_p;
+    assigns h_act_block_index_p, h_act_page_p;
+    assigns clean_counter;
+    assigns chance_index_p ;
+    assigns chance_arr[0..(LRU_SIZE-1)];
+    assigns cache[0..(LRU_SIZE-1)];
     
 /// Ensure ////
 /// General Constraints ///
@@ -389,7 +405,7 @@ void write (int d, int lb, int lp) {
     
     update_lru(lb, lp);
     
-     //if there is no clean block then GC
+    //if there is no clean block then GC
     //if (clean_counter < 2){
     //    gc();
     //}
