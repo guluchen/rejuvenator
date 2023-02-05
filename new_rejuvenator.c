@@ -404,11 +404,13 @@ void write (int d, int lb, int lp) {
     write_helper(d, lb, lp);
     
     update_lru(lb, lp);
-    
-    //if there is no clean block then GC
-    //if (clean_counter < 2){
-    //    gc();
-    //}
+    //@ assert \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp) ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
+    //@ assert                                                                                                                      logical_disk[lb][lp] == disk[l_to_p[lb][lp] / N_PAGE][l_to_p[lb][lp] % N_PAGE];
+    //@ assert \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1                         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
+    // if there is no clean block then GC
+    if (clean_counter < 2){
+        gc();
+    }
 }
 
 /*@
@@ -510,17 +512,17 @@ void write (int d, int lb, int lp) {
  // active block
     ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
         ==> (l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p && disk[index_2_physical[l_act_block_index_p]][p] == -1);
-    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
-        ==> l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p;
-    ensures \forall integer p; l_act_page_p <= p < N_PAGE
-        ==> disk[index_2_physical[l_act_block_index_p]][p] == -1;
+    //ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
+    //    ==> l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p;
+    //ensures \forall integer p; l_act_page_p <= p < N_PAGE
+    //    ==> disk[index_2_physical[l_act_block_index_p]][p] == -1;
     
     ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
         ==> (l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p && disk[index_2_physical[h_act_block_index_p]][p] == -1);
-    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
-        ==> l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p;
-    ensures \forall integer p; h_act_page_p <= p < N_PAGE
-        ==> disk[index_2_physical[h_act_block_index_p]][p] == -1;
+    //ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
+    //    ==> l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p;
+    //ensures \forall integer p; h_act_page_p <= p < N_PAGE
+    //    ==> disk[index_2_physical[h_act_block_index_p]][p] == -1;
  // original data in memory are still the same == \old(logical_disk[][])
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]) == \old(disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE]);
@@ -639,17 +641,17 @@ void write_helper (int d, int lb, int lp) {
  // active block
     ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
         ==> (l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p && disk[index_2_physical[l_act_block_index_p]][p] == -1);
-    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
-        ==> l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p;
-    ensures \forall integer p; l_act_page_p <= p < N_PAGE
-        ==> disk[index_2_physical[l_act_block_index_p]][p] == -1;
+    //ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
+    //    ==> l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p;
+    //ensures \forall integer p; l_act_page_p <= p < N_PAGE
+    //    ==> disk[index_2_physical[l_act_block_index_p]][p] == -1;
     
     ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
         ==> (l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p && disk[index_2_physical[h_act_block_index_p]][p] == -1);
-    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
-        ==> l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p;
-    ensures \forall integer p; h_act_page_p <= p < N_PAGE
-        ==> disk[index_2_physical[h_act_block_index_p]][p] == -1;
+    //ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
+    //    ==> l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p;
+    //ensures \forall integer p; h_act_page_p <= p < N_PAGE
+    //    ==> disk[index_2_physical[h_act_block_index_p]][p] == -1;
  // original data in memory are still the same == \old(logical_disk[][])
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]) == \old(disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE]);
@@ -849,17 +851,17 @@ void write_2_higher_number_list (int d, int lb, int lp) {
  // active block
     ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
         ==> (l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p && disk[index_2_physical[l_act_block_index_p]][p] == -1);
-    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
-        ==> l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p;
-    ensures \forall integer p; l_act_page_p <= p < N_PAGE
-        ==> disk[index_2_physical[l_act_block_index_p]][p] == -1;
+    //ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
+    //    ==> l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p;
+    //ensures \forall integer p; l_act_page_p <= p < N_PAGE
+    //    ==> disk[index_2_physical[l_act_block_index_p]][p] == -1;
     
     ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
         ==> (l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p && disk[index_2_physical[h_act_block_index_p]][p] == -1);
-    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
-        ==> l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p;
-    ensures \forall integer p; h_act_page_p <= p < N_PAGE
-        ==> disk[index_2_physical[h_act_block_index_p]][p] == -1;
+    //ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
+    //    ==> l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p;
+    //ensures \forall integer p; h_act_page_p <= p < N_PAGE
+    //    ==> disk[index_2_physical[h_act_block_index_p]][p] == -1;
  // original data in memory are still the same == \old(logical_disk[][])
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1 && (i != lb && j != lp)
         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]);
@@ -964,6 +966,7 @@ void write_2_lower_number_list (int d, int lb, int lp) {
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
          ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
  // active pointers in range
+    requires l_act_block_index_p != h_act_block_index_p;
     requires 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     requires 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
  // clean_counter == # of true in clean[] && in range
@@ -973,9 +976,25 @@ void write_2_lower_number_list (int d, int lb, int lp) {
     requires 0 <= chance_index_p < LRU_SIZE;
 /// User ///
 /// System ///
+ // a clean block
+    requires \forall integer i; 0 <= i < N_PHY_BLOCKS
+         ==> (clean[index_2_physical[i]] == true
+             ==> (\forall integer j, m, n; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && 0 <= j < N_PAGE
+                 ==> l_to_p[m][n] != index_2_physical[i] * N_PAGE + j && disk[index_2_physical[i]][j] == -1));
+ // somewhere clean
+    requires 2 <= clean_counter == count_clean(N_PHY_BLOCKS)
+         ==> (\exists integer i, j; 0 <= i < N_PHY_BLOCKS && 0 <= j < N_PHY_BLOCKS && i != j && clean[index_2_physical[i]] == clean[index_2_physical[j]] == true);
+ // active block
+    requires \forall integer i, m, n; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= i < N_PAGE
+         ==> (l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + i && disk[index_2_physical[l_act_block_index_p]][i] == -1);
+    requires \forall integer j, m, n; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= j < N_PAGE
+         ==> (l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + j && disk[index_2_physical[h_act_block_index_p]][j] == -1);
  // original data in memory are still the same
     requires \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1
          ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE];
+    
+/// Assign ///
+    
 /// Ensure ////
 /// General Constraints ///
  // erase_block_index[] in range
@@ -987,19 +1006,33 @@ void write_2_lower_number_list (int d, int lb, int lp) {
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE
         ==> 0 <= l_to_p[i][j] < N_PHY_BLOCKS * N_PAGE || l_to_p[i][j] == -1;
  // active pointers in range
+    ensures l_act_block_index_p != h_act_block_index_p;
     ensures 0 <= l_act_block_index_p < N_PHY_BLOCKS && 0 <= h_act_block_index_p < N_PHY_BLOCKS;
     ensures 0 <= l_act_page_p < N_PAGE && 0 <= h_act_page_p < N_PAGE;
  // clean_counter == # of true in clean[] && in range
-    ensures 2 <= clean_counter == count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
+    ensures 2 <= count_clean(N_PHY_BLOCKS) <= N_PHY_BLOCKS - 2;
+    ensures clean_counter == count_clean(N_PHY_BLOCKS);
  // clean[active pointing block] == false
     ensures clean[index_2_physical[l_act_block_index_p]] == clean[index_2_physical[h_act_block_index_p]] == false;
     ensures 0 <= chance_index_p < LRU_SIZE;
 /// User ///
 /// System ///
+ // a clean block
+    ensures \forall integer i; 0 <= i < N_PHY_BLOCKS
+        ==> (clean[index_2_physical[i]] == true
+            ==> (\forall integer j, m, n; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && 0 <= j < N_PAGE
+                ==> l_to_p[m][n] != index_2_physical[i] * N_PAGE + j && disk[index_2_physical[i]][j] == -1));
+ // somewhere clean
+    ensures 2 <= clean_counter == count_clean(N_PHY_BLOCKS)
+         ==> (\exists integer i, j; 0 <= i < N_PHY_BLOCKS && 0 <= j < N_PHY_BLOCKS && i != j && clean[index_2_physical[i]] == clean[index_2_physical[j]] == true);
+ // active block
+    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && l_act_page_p <= p < N_PAGE
+        ==> (l_to_p[m][n] != index_2_physical[l_act_block_index_p] * N_PAGE + p && disk[index_2_physical[l_act_block_index_p]][p] == -1);
+    ensures \forall integer m, n, p; 0 <= m < N_LOG_BLOCKS && 0 <= n < N_PAGE && h_act_page_p <= p < N_PAGE
+        ==> (l_to_p[m][n] != index_2_physical[h_act_block_index_p] * N_PAGE + p && disk[index_2_physical[h_act_block_index_p]][p] == -1);
  // original data in memory are still the same == \old(logical_disk[][])
     ensures \forall integer i, j; 0 <= i < N_LOG_BLOCKS && 0 <= j < N_PAGE && logical_disk[i][j] != -1
         ==> logical_disk[i][j] == disk[l_to_p[i][j] / N_PAGE][l_to_p[i][j] % N_PAGE] == \old(logical_disk[i][j]);
-/// Assign ///
     
 */
 void gc (void) {
